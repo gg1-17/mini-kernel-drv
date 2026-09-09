@@ -1,0 +1,14 @@
+name: Build Driver
+on: push
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install WDK
+      uses: jschueller/setup-wdk@v1
+
+    - name: Build
+      run: msbuild /p:Platform=x64 /p:Configuration=Release
