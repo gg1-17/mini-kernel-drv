@@ -8,45 +8,59 @@
   </ItemGroup>
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
-    <ProjectGuid>{11111111-2222-3333-4444-555555555555}</ProjectGuid>
-    <Keyword>WindowsDriver</Keyword>
-    <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
+    <ProjectGuid>{7A6C42D1-910E-4F2B-9873-412804D7C356}</ProjectGuid>
+    <Keyword>WindowsKernelModeDriver</Keyword>
+    <WindowsKernelModeDriver>true</WindowsKernelModeDriver>
+    <RootNamespace>minidrv</RootNamespace>
+    <PlatformToolset>v143</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Driver</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>WindowsDriver</PlatformToolset>
+    <PlatformToolset>v143</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
   </ImportGroup>
   <ImportGroup Label="Shared">
-    <Import Project="$(WDKContentRoot)\build\WindowsDriver.Common.props" Condition="Exists('$(WDKContentRoot)\build\WindowsDriver.Common.props')" />
   </ImportGroup>
-  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="ConfigurationSpecific">
-    <Import Project="$(WDKContentRoot)\build\WindowsDriver.Release.props" Condition="Exists('$(WDKContentRoot)\build\WindowsDriver.Release.props')" />
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
   </ImportGroup>
   <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+    <TargetVersion>Windows10</TargetVersion>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
-      <PreprocessorDefinitions>_WIN64;_AMD64;DRIVER;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <WarningLevel>Level3</WarningLevel>
       <Optimization>MaxSpeed</Optimization>
-      <SDLCheck>true</SDLCheck>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <PreprocessorDefinitions>_KERNEL;_X64;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <DisableSpecificWarnings>4100;4189</DisableSpecificWarnings>
     </ClCompile>
     <Link>
-      <AdditionalDependencies>ntoskrnl.lib;%(AdditionalDependencies)</AdditionalDependencies>
-      <DriverEntry>DriverEntry</DriverEntry>
-      <GenerateDriverPackage>false</GenerateDriverPackage>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <EntryPoint>DriverEntry</EntryPoint>
+      <SubSystem>Native</SubSystem>
+      <TargetMachine>MachineX64</TargetMachine>
+      <Driver>Driver</Driver>
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="minidrv.c" />
   </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Windows.WDK.x64" Version="10.0.26100.0" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
-    <Import Project="$(WDKContentRoot)\build\WindowsDriver.targets" Condition="Exists('$(WDKContentRoot)\build\WindowsDriver.targets')" />
   </ImportGroup>
 </Project>
