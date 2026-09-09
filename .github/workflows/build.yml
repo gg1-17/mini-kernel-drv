@@ -11,9 +11,8 @@ jobs:
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Install WDK via winget
-        run: |
-          winget install Microsoft.WindowsWDK.10.0.26100 --silent --accept-package-agreements --accept-source-agreements
+      - name: Restore NuGet packages
+        run: nuget restore minidrv.vcxproj
 
       - name: Build project
         run: msbuild minidrv.vcxproj /p:Platform=x64 /p:Configuration=Release
