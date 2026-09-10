@@ -13,6 +13,22 @@ jobs:
           winget install --source winget --exact --id Microsoft.WindowsWDK.10.0.26100 --silent --accept-source-agreements --accept-package-agreements
         shell: pwsh
 
+      - name: Wait for WDK files to be fully extracted
+        run: |
+          $wdkKmPath = "C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\km"
+          for($i=0;$i -lt 30;$i++){
+            if(Test-Path $wdkKmPath){
+              Write-Host "WDK km directory ready"
+              break
+            }
+            Start-Sleep -Seconds 2
+            Write-Host "Waiting for WDK files..."
+          }
+          if(-not (Test-Path $wdkKmPath)){
+            throw "WDK km folder not found after wait!"
+          }
+        shell: pwsh
+
       - name: Setup MSVC dev cmd
         uses: ilammy/msvc-dev-cmd@v1
 
