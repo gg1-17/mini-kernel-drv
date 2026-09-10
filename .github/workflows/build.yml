@@ -8,16 +8,17 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Install Windows Driver Kit
+      - name: Install Windows Driver Kit 10.0.26100
         run: |
-          winget install --silent Microsoft.WindowsDriverKit
-          Start-Sleep -Seconds 120
+          winget install --source winget --exact --id Microsoft.WindowsWDK.10.0.26100 --silent --accept-source-agreements --accept-package-agreements
+        shell: pwsh
 
       - name: Setup MSVC dev cmd
         uses: ilammy/msvc-dev-cmd@v1
 
       - name: Build driver
         run: msbuild minidrv.vcxproj /p:Platform=x64 /p:Configuration=Release
+        shell: pwsh
 
       - name: Upload sys artifact
         uses: actions/upload-artifact@v4
