@@ -8,11 +8,13 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
+      - name: Install Windows Driver Kit
+        uses: microsoft/windows-driver-kit@v1
+        with:
+          wdk-version: "10.0.26100.0"
+
       - name: Setup MSVC
         uses: ilammy/msvc-dev-cmd@v1
-
-      - name: Restore NuGet packages
-        run: nuget restore minidrv.vcxproj
 
       - name: Build project
         run: msbuild minidrv.vcxproj /p:Platform=x64 /p:Configuration=Release
