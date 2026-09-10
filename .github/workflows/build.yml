@@ -1,4 +1,4 @@
-name: Build Kernel Driver (CI‑Install WDK)
+name: Build Kernel Driver NuGet Only
 on: push
 
 jobs:
@@ -8,17 +8,11 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Download Windows SDK 10.0.26100
-        run: |
-          Invoke-WebRequest -Uri "https://aka.ms/winsdk-10.0.26100" -OutFile "sdksetup.exe"
-          .\sdksetup.exe /quiet /norestart
-      - name: Download WDK 10.0.26100
-        run: |
-          Invoke-WebRequest -Uri "https://aka.ms/wdk-10.0.26100" -OutFile "wdksetup.exe"
-          .\wdksetup.exe /quiet /norestart
-
-      - name: Setup MSVC dev environment
+      - name: Setup MSVC dev cmd
         uses: ilammy/msvc-dev-cmd@v1
+
+      - name: Restore NuGet packages
+        run: nuget restore
 
       - name: Build driver
         run: msbuild minidrv.vcxproj /p:Platform=x64 /p:Configuration=Release
