@@ -32,13 +32,21 @@ jobs:
       - name: Setup MSVC dev cmd
         uses: ilammy/msvc-dev-cmd@v1
 
+      - name: Append WDK km paths to environment variables
+        run: |
+          $wdkVer = "10.0.26100.0"
+          $kmInc = "C:\Program Files (x86)\Windows Kits\10\Include\$wdkVer\km"
+          $kmLib = "C:\Program Files (x86)\Windows Kits\10\Lib\$wdkVer\km\x64"
+          $env:INCLUDE = "$kmInc;$env:INCLUDE"
+          $env:LIB = "$kmLib;$env:LIB"
+          Write-Host "INCLUDE=$env:INCLUDE"
+          Write-Host "LIB=$env:LIB"
+        shell: pwsh
+
       - name: Build driver
         run: |
-          set wdkVer=10.0.26100.0
-          set kmInc=C:\Program Files (x86)\Windows Kits\10\Include\%wdkVer%\km
-          set kmLib=C:\Program Files (x86)\Windows Kits\10\Lib\%wdkVer%\km\x64
-          msbuild minidrv.vcxproj /p:Platform=x64 /p:Configuration=Release /p:IncludePath="%kmInc%;$(IncludePath)" /p:LibraryPath="%kmLib%;$(LibraryPath)"
-        shell: cmd
+          msbuild minidrv.vcxproj /p:Platform=x64 /p:Configuration=Release
+        shell: pwsh
 
       - name: Upload sys artifact
         uses: actions/upload-artifact@v4
