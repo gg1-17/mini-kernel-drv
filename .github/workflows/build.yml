@@ -1,16 +1,21 @@
-name: Build Kernel Driver
+name: Build Kernel Driver (CI‑Install WDK)
 on: push
 
 jobs:
   build:
     runs-on: windows-latest
     steps:
-      - name: Checkout code
+      - name: Checkout source
         uses: actions/checkout@v4
 
-      - name: Install WDK via Chocolatey
+      - name: Download Windows SDK 10.0.26100
         run: |
-          choco install windowsdriverkit -y --version=10.0.26100.0
+          Invoke-WebRequest -Uri "https://aka.ms/winsdk-10.0.26100" -OutFile "sdksetup.exe"
+          .\sdksetup.exe /quiet /norestart
+      - name: Download WDK 10.0.26100
+        run: |
+          Invoke-WebRequest -Uri "https://aka.ms/wdk-10.0.26100" -OutFile "wdksetup.exe"
+          .\wdksetup.exe /quiet /norestart
 
       - name: Setup MSVC dev environment
         uses: ilammy/msvc-dev-cmd@v1
@@ -18,7 +23,7 @@ jobs:
       - name: Build driver
         run: msbuild minidrv.vcxproj /p:Platform=x64 /p:Configuration=Release
 
-      - name: Upload sys file
+      - name: Upload sys artifact
         uses: actions/upload-artifact@v4
         with:
           name: minidrv-sys
