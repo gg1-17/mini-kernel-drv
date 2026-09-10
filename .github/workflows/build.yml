@@ -44,5 +44,5 @@ jobs:
       - name: Upload sys artifact
         uses: actions/upload-artifact@v4
         with:
-          name: minidrv-sys
-          path: x64\Release\minidrv.sys
+          name: driver-sys
+          path: minidrv/x64/Release/minidrv.sys
