@@ -10,18 +10,23 @@
     <VCProjectVersion>17.0</VCProjectVersion>
     <ProjectGuid>{7A6C42D1-910E-4F2B-9873-412804D7C356}</ProjectGuid>
     <RootNamespace>minidrv</RootNamespace>
-    <Keyword>WindowsKernelModeDriver</Keyword>
-    <WindowsKernelModeDriver>true</WindowsKernelModeDriver>
-    <PlatformToolset>WindowsDriver</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Driver</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
     <CharacterSet>Unicode</CharacterSet>
-    <TargetVersion>Windows10</TargetVersion>
+    <PlatformToolset>v143</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+
+  <!-- NuGet包路径 -->
+  <PropertyGroup>
+    <NuGetRoot>$(SolutionDir)packages</NuGetRoot>
+    <WdkInc>$(NuGetRoot)\Microsoft.WindowsDriverKit.10.0.26100.0\build\inc</WdkInc>
+    <WdkLibX64>$(NuGetRoot)\Microsoft.WindowsDriverKit.10.0.26100.0\build\lib\x64</WdkLibX64>
+  </PropertyGroup>
+
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
@@ -31,6 +36,7 @@
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <PreprocessorDefinitions>_KERNEL;_X64;NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <DisableSpecificWarnings>4100;4189</DisableSpecificWarnings>
+      <AdditionalIncludeDirectories>$(WdkInc);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -40,10 +46,14 @@
       <SubSystem>Native</SubSystem>
       <TargetMachine>MachineX64</TargetMachine>
       <Driver>Driver</Driver>
+      <AdditionalLibraryDirectories>$(WdkLibX64);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>ntoskrnl.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
+
   <ItemGroup>
     <ClCompile Include="minidrv.c" />
   </ItemGroup>
+
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>
