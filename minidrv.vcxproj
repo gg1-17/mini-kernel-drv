@@ -60,6 +60,9 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Windows.WDK.x64" Version="10.0.26100.0" />
   </ItemGroup>
+
+  <Import Project="$(NuGetPackageRoot)\Microsoft.Windows.WDK.x64\10.0.26100.0\build\Microsoft.Windows.WDK.x64.targets" Condition="Exists('$(NuGetPackageRoot)\Microsoft.Windows.WDK.x64\10.0.26100.0\build\Microsoft.Windows.WDK.x64.targets')" />
+
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
