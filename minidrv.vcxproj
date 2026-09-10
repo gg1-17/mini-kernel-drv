@@ -12,13 +12,13 @@
     <Keyword>WindowsKernelModeDriver</Keyword>
     <WindowsKernelModeDriver>true</WindowsKernelModeDriver>
     <RootNamespace>minidrv</RootNamespace>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>WindowsDriver</PlatformToolset>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>Driver</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>v143</PlatformToolset>
+    <PlatformToolset>WindowsDriver</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
@@ -57,12 +57,6 @@
   <ItemGroup>
     <ClCompile Include="minidrv.c" />
   </ItemGroup>
-  <ItemGroup>
-    <PackageReference Include="Microsoft.Windows.WDK.x64" Version="10.0.26100.0" />
-  </ItemGroup>
-
-  <Import Project="$(NuGetPackageRoot)\Microsoft.Windows.WDK.x64\10.0.26100.0\build\Microsoft.Windows.WDK.x64.targets" Condition="Exists('$(NuGetPackageRoot)\Microsoft.Windows.WDK.x64\10.0.26100.0\build\Microsoft.Windows.WDK.x64.targets')" />
-
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
