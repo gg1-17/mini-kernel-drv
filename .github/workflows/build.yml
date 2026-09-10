@@ -40,8 +40,8 @@ jobs:
           msbuild minidrv.vcxproj `
             /p:Platform=x64 `
             /p:Configuration=Release `
-            /p:IncludePath="$kmInc;$(IncludePath)" `
-            /p:LibraryPath="$kmLib;$(LibraryPath)"
+            /p:IncludePath='$kmInc;$(IncludePath)' `
+            /p:LibraryPath='$kmLib;$(LibraryPath)'
         shell: pwsh
 
       - name: Upload sys artifact
