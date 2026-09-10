@@ -31,22 +31,15 @@ jobs:
 
       - name: Setup MSVC + Append WDK km paths & Build
         run: |
-          & "C:\Program Files\Microsoft Visual Studio\18\Enterprise\VC\Auxiliary\Build\vcvars64.bat" > nul
-          
-          $wdkVer = "10.0.26100.0"
-          $kmInc = "C:\Program Files (x86)\Windows Kits\10\Include\$wdkVer\km"
-          $kmLib = "C:\Program Files (x86)\Windows Kits\10\Lib\$wdkVer\km\x64"
-          
-          $env:INCLUDE = "$kmInc;$env:INCLUDE"
-          $env:LIB = "$kmLib;$env:LIB"
-          
-          Write-Host "=== INCLUDE ==="
-          Write-Host $env:INCLUDE
-          Write-Host "=== LIB ==="
-          Write-Host $env:LIB
-
+          call "C:\Program Files\Microsoft Visual Studio\18\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
+          set "INCLUDE=C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\km;%INCLUDE%"
+          set "LIB=C:\Program Files (x86)\Windows Kits\10\Lib\10.0.26100.0\km\x64;%LIB%"
+          echo === INCLUDE ===
+          echo %INCLUDE%
+          echo === LIB ===
+          echo %LIB%
           msbuild minidrv.vcxproj /p:Platform=x64 /p:Configuration=Release
-        shell: pwsh
+        shell: cmd
 
       - name: Upload sys artifact
         uses: actions/upload-artifact@v4
