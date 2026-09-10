@@ -16,8 +16,16 @@ jobs:
       - name: Setup MSVC dev cmd
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Build driver
-        run: msbuild minidrv.vcxproj /p:Platform=x64 /p:Configuration=Release
+      - name: Build driver, inject WDK km paths via MSBuild properties
+        run: |
+          $wdkVer = "10.0.26100.0"
+          $kmInc = "C:\Program Files (x86)\Windows Kits\10\Include\$wdkVer\km"
+          $kmLib = "C:\Program Files (x86)\Windows Kits\10\Lib\$wdkVer\km\x64"
+          msbuild minidrv.vcxproj `
+            /p:Platform=x64 `
+            /p:Configuration=Release `
+            /p:IncludePath="$kmInc;$(IncludePath)" `
+            /p:LibraryPath="$kmLib;$(LibraryPath)"
         shell: pwsh
 
       - name: Upload sys artifact
