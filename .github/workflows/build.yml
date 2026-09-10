@@ -1,4 +1,4 @@
-name: Build Kernel Driver NuGet Only
+name: Build Kernel Driver
 on: push
 
 jobs:
@@ -8,11 +8,13 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v4
 
+      - name: Install Windows Driver Kit
+        run: |
+          winget install --silent Microsoft.WindowsDriverKit
+          Start-Sleep -Seconds 120
+
       - name: Setup MSVC dev cmd
         uses: ilammy/msvc-dev-cmd@v1
-
-      - name: Restore NuGet packages
-        run: nuget restore
 
       - name: Build driver
         run: msbuild minidrv.vcxproj /p:Platform=x64 /p:Configuration=Release
