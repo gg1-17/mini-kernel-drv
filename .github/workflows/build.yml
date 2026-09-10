@@ -1,26 +1,25 @@
-name: Build Driver
+name: Build Kernel Driver
 on: push
 
 jobs:
   build:
     runs-on: windows-latest
     steps:
-      - name: Checkout source
+      - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Windows Driver Kit
-        uses: microsoft/windows-driver-kit@v1
-        with:
-          wdk-version: "10.0.26100.0"
+      - name: Install WDK via Chocolatey
+        run: |
+          choco install windowsdriverkit -y --version=10.0.26100.0
 
-      - name: Setup MSVC
+      - name: Setup MSVC dev environment
         uses: ilammy/msvc-dev-cmd@v1
 
-      - name: Build project
+      - name: Build driver
         run: msbuild minidrv.vcxproj /p:Platform=x64 /p:Configuration=Release
 
-      - name: Upload sys artifact
+      - name: Upload sys file
         uses: actions/upload-artifact@v4
         with:
-          name: driver-sys
+          name: minidrv-sys
           path: x64\Release\minidrv.sys
