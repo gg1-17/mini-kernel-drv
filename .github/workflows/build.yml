@@ -29,22 +29,22 @@ jobs:
           }
         shell: pwsh
 
-      - name: Setup MSVC dev cmd
-        uses: ilammy/msvc-dev-cmd@v1
-
-      - name: Append WDK km paths to environment variables
+      - name: Setup MSVC + Append WDK km paths & Build
         run: |
+          & "C:\Program Files\Microsoft Visual Studio\18\Enterprise\VC\Auxiliary\Build\vcvars64.bat" > nul
+          
           $wdkVer = "10.0.26100.0"
           $kmInc = "C:\Program Files (x86)\Windows Kits\10\Include\$wdkVer\km"
           $kmLib = "C:\Program Files (x86)\Windows Kits\10\Lib\$wdkVer\km\x64"
+          
           $env:INCLUDE = "$kmInc;$env:INCLUDE"
           $env:LIB = "$kmLib;$env:LIB"
-          Write-Host "INCLUDE=$env:INCLUDE"
-          Write-Host "LIB=$env:LIB"
-        shell: pwsh
+          
+          Write-Host "=== INCLUDE ==="
+          Write-Host $env:INCLUDE
+          Write-Host "=== LIB ==="
+          Write-Host $env:LIB
 
-      - name: Build driver
-        run: |
           msbuild minidrv.vcxproj /p:Platform=x64 /p:Configuration=Release
         shell: pwsh
 
