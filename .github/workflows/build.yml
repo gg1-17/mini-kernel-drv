@@ -28,6 +28,11 @@ jobs:
             throw "WDK km folder not found after wait!"
           }
         shell: pwsh
+        
+      - name: Check WDK ntddk.h exists
+        run: |
+          dir "C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\km\ntddk.h"
+        shell: cmd
 
       - name: Setup MSVC & Build Driver
         run: |
