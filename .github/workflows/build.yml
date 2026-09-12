@@ -41,7 +41,7 @@ jobs:
           set "WDK_INC=C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\km"
           set "WDK_LIB=C:\Program Files (x86)\Windows Kits\10\Lib\10.0.26100.0\km\x64"
           cl /c /I"%WDK_INC%" /Zi /O2 /D _AMD64_ /D _KERNEL_MODE minidrv.c
-          link minidrv.obj /LIBPATH:"%WDK_LIB%" ntoskrnl.lib /SUBSYSTEM:NATIVE /DRIVER
+          link minidrv.obj /LIBPATH:"%WDK_LIB%" ntoskrnl.lib /SUBSYSTEM:NATIVE /DRIVER /ENTRY:DriverEntry
         shell: cmd
 
       - name: List files debug
