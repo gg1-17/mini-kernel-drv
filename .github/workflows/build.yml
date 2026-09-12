@@ -29,16 +29,10 @@ jobs:
           }
         shell: pwsh
 
-      - name: Setup MSVC + Append WDK km paths & Build
+      - name: Setup MSVC + Build Driver
         run: |
           call "C:\Program Files\Microsoft Visual Studio\18\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          set "INCLUDE=C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\km;%INCLUDE%"
-          set "LIB=C:\Program Files (x86)\Windows Kits\10\Lib\10.0.26100.0\km\x64;%LIB%"
-          echo === INCLUDE ===
-          echo %INCLUDE%
-          echo === LIB ===
-          echo %LIB%
-          msbuild minidrv.vcxproj /p:Platform=x64 /p:Configuration=Release
+          msbuild minidrv.vcxproj /p:Platform=x64 /p:Configuration=Release /p:AdditionalIncludeDirectories="C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\km" /p:AdditionalLibraryDirectories="C:\Program Files (x86)\Windows Kits\10\Lib\10.0.26100.0\km\x64"
         shell: cmd
 
       - name: Upload sys artifact
