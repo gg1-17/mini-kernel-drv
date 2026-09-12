@@ -1,6 +1,7 @@
 name: Build Kernel Driver
-on: push
-
+on:
+  push:
+    branches: [ main ]
 jobs:
   build:
     runs-on: windows-latest
@@ -13,7 +14,7 @@ jobs:
           winget install --source winget --exact --id Microsoft.WindowsWDK.10.0.26100 --silent --accept-source-agreements --accept-package-agreements
         shell: pwsh
 
-      - name: Wait for WDK files to be fully extracted
+      - name: Wait & Verify WDK km folder
         run: |
           $wdkKmPath = "C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\km"
           for($i=0;$i -lt 30;$i++){
@@ -28,21 +29,27 @@ jobs:
             throw "WDK km folder not found after wait!"
           }
         shell: pwsh
-        
-      - name: Check WDK ntddk.h exists
+
+      - name: Check ntddk.h exists
         run: |
           dir "C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\km\ntddk.h"
         shell: cmd
 
-      - name: Setup MSVC & Build Driver
+      - name: Build Driver CL+Link
         run: |
           call "C:\Program Files\Microsoft Visual Studio\18\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
-          msbuild minidrv.vcxproj /p:Platform=x64 /p:Configuration=Release
+          set "WDK_INC=C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\km"
+          set "WDK_LIB=C:\Program Files (x86)\Windows Kits\10\Lib\10.0.26100.0\km\x64"
+          cl /c /I"%WDK_INC%" /Zi /O2 /D _AMD64_ /D _KERNEL_MODE minidrv.c
+          link minidrv.obj /LIBPATH:"%WDK_LIB%" ntoskrnl.lib /SUBSYSTEM:NATIVE /DRIVER
         shell: cmd
 
+      - name: List files debug
+        run: dir
+        shell: cmd
 
-      - name: Upload sys artifact
+      - name: Upload compiled sys
         uses: actions/upload-artifact@v4
         with:
           name: driver-sys
-          path: minidrv/x64/Release/minidrv.sys
+          path: minidrv.sys
