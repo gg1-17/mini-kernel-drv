@@ -1,16 +1,15 @@
-#define TARGET_WIN10_BUILD  19045
-#define TARGET_WIN10_REVISION 7184
 #include <ntdef.h>
 #include <wdm.h>
+
+typedef VOID (*PPROCESS_NOTIFY_ROUTINE)(
+    _In_ HANDLE ParentId,
+    _In_ HANDLE ProcessId,
+    _In_ BOOLEAN Create
+);
 
 typedef NTSTATUS(NTAPI* PPSREMOVEPROCESSNOTIFYROUTINE)(
     _In_ PPROCESS_NOTIFY_ROUTINE NotifyRoutine
 );
-
-typedef struct _PROCESS_NOTIFY_ENTRY
-{
-    PPROCESS_NOTIFY_ROUTINE NotifyRoutine;
-} PROCESS_NOTIFY_ENTRY, *PPROCESS_NOTIFY_ENTRY;
 
 typedef NTSTATUS(NTAPI* PNTQUERYSYSTEMINFORMATION)(
     _In_ SYSTEM_INFORMATION_CLASS SystemInformationClass,
@@ -19,10 +18,19 @@ typedef NTSTATUS(NTAPI* PNTQUERYSYSTEMINFORMATION)(
     _Out_opt_ PULONG ReturnLength
 );
 
+#define SystemProcessNotifyInformation (SYSTEM_INFORMATION_CLASS)63
+typedef struct _PROCESS_NOTIFY_ENTRY
+{
+    PPROCESS_NOTIFY_ROUTINE NotifyRoutine;
+} PROCESS_NOTIFY_ENTRY, *PPROCESS_NOTIFY_ENTRY;
+
+#define IoDriverObjectType 4
+
 NTKERNELAPI PLIST_ENTRY PsGetProcessList(VOID);
 NTKERNELAPI UCHAR* PsGetProcessImageFileName(PEPROCESS Process);
 NTKERNELAPI NTSTATUS PsTerminateProcess(PEPROCESS Process, NTSTATUS ExitStatus);
 NTKERNELAPI HANDLE PsGetProcessId(PEPROCESS Process);
+NTKERNELAPI NTSTATUS PsLookupProcessByProcessId(HANDLE ProcessId, PEPROCESS *Process);
 
 PPSREMOVEPROCESSNOTIFYROUTINE g_pPsRemoveProcessNotifyRoutine = NULL;
 PNTQUERYSYSTEMINFORMATION g_pNtQuerySystemInformation = NULL;
@@ -40,6 +48,11 @@ NTSTATUS RemoveSysdiagProcessNotifyCallbacks()
     PVOID pBuffer = NULL;
     UNICODE_STRING routineName;
     PPROCESS_NOTIFY_ENTRY pNotifyEntry;
+    ULONG i;
+    PIMAGE_DOS_HEADER pDos;
+    PIMAGE_NT_HEADERS pNt;
+    PVOID modBase;
+    SIZE_T modSize;
 
     RtlInitUnicodeString(&routineName, L"PsRemoveProcessNotifyRoutine");
     g_pPsRemoveProcessNotifyRoutine = (PPSREMOVEPROCESSNOTIFYROUTINE)MmGetSystemRoutineAddress(&routineName);
@@ -92,25 +105,32 @@ NTSTATUS RemoveSysdiagProcessNotifyCallbacks()
     pNotifyEntry = (PPROCESS_NOTIFY_ENTRY)pBuffer;
     for (; pNotifyEntry->NotifyRoutine != NULL; pNotifyEntry++)
     {
-        PVOID pBase;
-        SIZE_T size;
-        status = MmGetSystemRoutineInformation(pNotifyEntry->NotifyRoutine, &pBase, &size);
-        if (NT_SUCCESS(status))
+        pDos = (PIMAGE_DOS_HEADER)pNotifyEntry->NotifyRoutine;
+        if (pDos->e_magic == IMAGE_DOS_SIGNATURE)
         {
-            UNICODE_STRING drvName;
-            RtlInitUnicodeString(&drvName, L"sysdiag.sys");
-            if (RtlIsSystemRoutineInModule(pNotifyEntry->NotifyRoutine, &drvName))
+            modBase = pNotifyEntry->NotifyRoutine;
+        }
+        else
+        {
+            modBase = NULL;
+        }
+        if (modBase == NULL)
+        {
+            continue;
+        }
+        pNt = (PIMAGE_NT_HEADERS)((PUCHAR)modBase + pDos->e_lfanew);
+        modSize = pNt->OptionalHeader.SizeOfImage;
+        if ((PUCHAR)pNotifyEntry->NotifyRoutine >= (PUCHAR)modBase && (PUCHAR)pNotifyEntry->NotifyRoutine < ((PUCHAR)modBase + modSize))
+        {
+            DbgPrint("MiniDrv: Found sysdiag notify routine %p, removing...\r\n", pNotifyEntry->NotifyRoutine);
+            status = g_pPsRemoveProcessNotifyRoutine(pNotifyEntry->NotifyRoutine);
+            if (NT_SUCCESS(status))
             {
-                DbgPrint("MiniDrv: Found sysdiag notify routine %p, removing...\r\n", pNotifyEntry->NotifyRoutine);
-                status = g_pPsRemoveProcessNotifyRoutine(pNotifyEntry->NotifyRoutine);
-                if (NT_SUCCESS(status))
-                {
-                    DbgPrint("MiniDrv: Remove callback OK\r\n");
-                }
-                else
-                {
-                    DbgPrint("MiniDrv: Remove callback FAILED status=%08X\r\n", status);
-                }
+                DbgPrint("MiniDrv: Remove callback OK\r\n");
+            }
+            else
+            {
+                DbgPrint("MiniDrv: Remove callback FAILED status=%08X\r\n", status);
             }
         }
     }
