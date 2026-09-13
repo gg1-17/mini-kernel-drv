@@ -64,7 +64,7 @@ VOID EnumAndKillHipsDaemon()
 
     while (pCurEntry != NULL && pCurEntry != pListHead)
     {
-        pEproc = CONTAINING_RECORD(pCurEntry, EPROCESS, ActiveProcessLinks);
+        pEproc = (PEPROCESS)((PUCHAR)pCurEntry - EPROCESS_ACTIVE_PROCESS_LINKS);
         pCurEntry = pCurEntry->Flink;
 
         pid = *(HANDLE*)((PUCHAR)pEproc + EPROCESS_UNIQUE_PROCESS_ID);
