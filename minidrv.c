@@ -1,6 +1,6 @@
 #define TARGET_WIN10_BUILD  19045
 #define TARGET_WIN15_REVISION 7184
-
+#include <ntdef.h>
 #include <wdm.h>
 
 typedef struct _EPROCESS EPROCESS;
