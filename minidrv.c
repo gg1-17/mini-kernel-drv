@@ -1,16 +1,31 @@
 #define TARGET_WIN10_BUILD  19045
-#define TARGET_WIN15_REVISION 7184
+#define TARGET_WIN10_REVISION 7184
 #include <ntdef.h>
 #include <wdm.h>
 
-typedef struct _EPROCESS EPROCESS;
+typedef NTSTATUS(NTAPI* PPSREMOVEPROCESSNOTIFYROUTINE)(
+    _In_ PPROCESS_NOTIFY_ROUTINE NotifyRoutine
+);
 
-#define EPROCESS_UNIQUE_PROCESS_ID      0x2E0
-#define EPROCESS_ACTIVE_PROCESS_LINKS   0x2F0
+typedef struct _PROCESS_NOTIFY_ENTRY
+{
+    PPROCESS_NOTIFY_ROUTINE NotifyRoutine;
+} PROCESS_NOTIFY_ENTRY, *PPROCESS_NOTIFY_ENTRY;
+
+typedef NTSTATUS(NTAPI* PNTQUERYSYSTEMINFORMATION)(
+    _In_ SYSTEM_INFORMATION_CLASS SystemInformationClass,
+    _Out_writes_bytes_opt_(SystemInformationLength) PVOID SystemInformation,
+    _In_ ULONG SystemInformationLength,
+    _Out_opt_ PULONG ReturnLength
+);
 
 NTKERNELAPI PLIST_ENTRY PsGetProcessList(VOID);
 NTKERNELAPI UCHAR* PsGetProcessImageFileName(PEPROCESS Process);
 NTKERNELAPI NTSTATUS PsTerminateProcess(PEPROCESS Process, NTSTATUS ExitStatus);
+NTKERNELAPI HANDLE PsGetProcessId(PEPROCESS Process);
+
+PPSREMOVEPROCESSNOTIFYROUTINE g_pPsRemoveProcessNotifyRoutine = NULL;
+PNTQUERYSYSTEMINFORMATION g_pNtQuerySystemInformation = NULL;
 
 VOID DriverUnload(_In_ PDRIVER_OBJECT DriverObject)
 {
@@ -18,11 +33,96 @@ VOID DriverUnload(_In_ PDRIVER_OBJECT DriverObject)
     DbgPrint("MiniDrv: Unload\r\n");
 }
 
+NTSTATUS RemoveSysdiagProcessNotifyCallbacks()
+{
+    NTSTATUS status;
+    ULONG returnLen = 0;
+    PVOID pBuffer = NULL;
+    UNICODE_STRING routineName;
+    PPROCESS_NOTIFY_ENTRY pNotifyEntry;
+
+    RtlInitUnicodeString(&routineName, L"PsRemoveProcessNotifyRoutine");
+    g_pPsRemoveProcessNotifyRoutine = (PPSREMOVEPROCESSNOTIFYROUTINE)MmGetSystemRoutineAddress(&routineName);
+    if (g_pPsRemoveProcessNotifyRoutine == NULL)
+    {
+        DbgPrint("MiniDrv: PsRemoveProcessNotifyRoutine not found\r\n");
+        return STATUS_NOT_FOUND;
+    }
+
+    RtlInitUnicodeString(&routineName, L"NtQuerySystemInformation");
+    g_pNtQuerySystemInformation = (PNTQUERYSYSTEMINFORMATION)MmGetSystemRoutineAddress(&routineName);
+    if (g_pNtQuerySystemInformation == NULL)
+    {
+        DbgPrint("MiniDrv: NtQuerySystemInformation not found\r\n");
+        return STATUS_NOT_FOUND;
+    }
+
+    status = g_pNtQuerySystemInformation(
+        SystemProcessNotifyInformation,
+        NULL,
+        0,
+        &returnLen
+    );
+    if (status != STATUS_INFO_LENGTH_MISMATCH || returnLen == 0)
+    {
+        DbgPrint("MiniDrv: Query notify info get size failed, status=%08X\r\n", status);
+        return status;
+    }
+
+    pBuffer = ExAllocatePool2(POOL_FLAG_NON_PAGED, returnLen, 'mdrv');
+    if (pBuffer == NULL)
+    {
+        DbgPrint("MiniDrv: Allocate pool failed\r\n");
+        return STATUS_INSUFFICIENT_RESOURCES;
+    }
+
+    status = g_pNtQuerySystemInformation(
+        SystemProcessNotifyInformation,
+        pBuffer,
+        returnLen,
+        &returnLen
+    );
+    if (!NT_SUCCESS(status))
+    {
+        DbgPrint("MiniDrv: Query notify info failed %08X\r\n", status);
+        ExFreePool(pBuffer);
+        return status;
+    }
+
+    pNotifyEntry = (PPROCESS_NOTIFY_ENTRY)pBuffer;
+    for (; pNotifyEntry->NotifyRoutine != NULL; pNotifyEntry++)
+    {
+        PVOID pBase;
+        SIZE_T size;
+        status = MmGetSystemRoutineInformation(pNotifyEntry->NotifyRoutine, &pBase, &size);
+        if (NT_SUCCESS(status))
+        {
+            UNICODE_STRING drvName;
+            RtlInitUnicodeString(&drvName, L"sysdiag.sys");
+            if (RtlIsSystemRoutineInModule(pNotifyEntry->NotifyRoutine, &drvName))
+            {
+                DbgPrint("MiniDrv: Found sysdiag notify routine %p, removing...\r\n", pNotifyEntry->NotifyRoutine);
+                status = g_pPsRemoveProcessNotifyRoutine(pNotifyEntry->NotifyRoutine);
+                if (NT_SUCCESS(status))
+                {
+                    DbgPrint("MiniDrv: Remove callback OK\r\n");
+                }
+                else
+                {
+                    DbgPrint("MiniDrv: Remove callback FAILED status=%08X\r\n", status);
+                }
+            }
+        }
+    }
+
+    ExFreePool(pBuffer);
+    return STATUS_SUCCESS;
+}
+
 NTSTATUS ForceKillProcessByPid(HANDLE pid)
 {
     NTSTATUS status;
     PEPROCESS pEprocess = NULL;
-
     status = PsLookupProcessByProcessId(pid, &pEprocess);
     if (!NT_SUCCESS(status))
     {
@@ -30,11 +130,9 @@ NTSTATUS ForceKillProcessByPid(HANDLE pid)
             HandleToUlong(pid), status);
         return status;
     }
-
+    DbgPrint("MiniDrv: Call PsTerminateProcess PID=%lu\r\n", HandleToUlong(pid));
     status = PsTerminateProcess(pEprocess, STATUS_SUCCESS);
-    DbgPrint("MiniDrv: PsTerminateProcess PID=%lu, status=%08X\r\n",
-        HandleToUlong(pid), status);
-
+    DbgPrint("MiniDrv: PsTerminateProcess done, status=%08X\r\n", status);
     ObDereferenceObject(pEprocess);
     return status;
 }
@@ -46,12 +144,6 @@ VOID EnumAndKillHipsDaemon()
     PEPROCESS pEproc = NULL;
     HANDLE pid = NULL;
     UCHAR imageName[16] = { 0 };
-    ANSI_STRING targetName = { 0 };
-    ANSI_STRING currentName = { 0 };
-    UCHAR* pImgName = NULL;
-    SIZE_T copyLength = 0;
-
-    RtlInitAnsiString(&targetName, "HipsDaemon.exe");
 
     pListHead = PsGetProcessList();
     if (pListHead == NULL)
@@ -59,34 +151,18 @@ VOID EnumAndKillHipsDaemon()
         DbgPrint("MiniDrv: PsGetProcessList returned NULL\r\n");
         return;
     }
-
     pCurEntry = pListHead->Flink;
-
     while (pCurEntry != NULL && pCurEntry != pListHead)
     {
-        pEproc = (PEPROCESS)((PUCHAR)pCurEntry - EPROCESS_ACTIVE_PROCESS_LINKS);
+        pEproc = (PEPROCESS)((PUCHAR)pCurEntry - FIELD_OFFSET(EPROCESS, ActiveProcessLinks));
         pCurEntry = pCurEntry->Flink;
-
-        pid = *(HANDLE*)((PUCHAR)pEproc + EPROCESS_UNIQUE_PROCESS_ID);
-        pImgName = PsGetProcessImageFileName(pEproc);
-
+        pid = PsGetProcessId(pEproc);
+        UCHAR* pImgName = PsGetProcessImageFileName(pEproc);
         if (pImgName != NULL)
         {
             RtlZeroMemory(imageName, sizeof(imageName));
-            copyLength = RtlStringCbLengthA((PCSTR)pImgName, sizeof(imageName));
-            if (copyLength < sizeof(imageName))
-            {
-                RtlCopyMemory(imageName, pImgName, copyLength);
-                imageName[copyLength] = '\0';
-            }
-            else
-            {
-                RtlCopyMemory(imageName, pImgName, sizeof(imageName) - 1);
-                imageName[sizeof(imageName) - 1] = '\0';
-            }
-
-            RtlInitAnsiString(&currentName, (PCSTR)imageName);
-            if (RtlCompareAnsiString(&currentName, &targetName, TRUE) == 0)
+            RtlStringCbCopyA(imageName, sizeof(imageName), (PCSTR)pImgName);
+            if (_stricmp((PCSTR)imageName, "HipsDaemon.exe") == 0)
             {
                 DbgPrint("MiniDrv: Found HipsDaemon.exe, PID=%lu\r\n", HandleToUlong(pid));
                 ForceKillProcessByPid(pid);
@@ -102,7 +178,7 @@ NTSTATUS DisableSysdiagService()
     UNICODE_STRING keyPath = { 0 };
     UNICODE_STRING valueName = { 0 };
     HANDLE hKey = NULL;
-    ULONG startValue = 4; // SERVICE_DISABLED
+    ULONG startValue = 4;
 
     RtlInitUnicodeString(&keyPath, L"\\Registry\\Machine\\System\\CurrentControlSet\\Services\\sysdiag");
     InitializeObjectAttributes(&objAttr, &keyPath, OBJ_CASE_INSENSITIVE | OBJ_KERNEL_HANDLE, NULL, NULL);
@@ -113,54 +189,68 @@ NTSTATUS DisableSysdiagService()
         DbgPrint("MiniDrv: ZwOpenKey sysdiag failed, status=%08X\r\n", status);
         return status;
     }
-
     RtlInitUnicodeString(&valueName, L"Start");
     status = ZwSetValueKey(hKey, &valueName, 0, REG_DWORD, &startValue, sizeof(ULONG));
     if (NT_SUCCESS(status))
     {
-        DbgPrint("MiniDrv: Set sysdiag Start=4 success\r\n");
+        DbgPrint("MiniDrv: Set sysdiag Start=4 SUCCESS\r\n");
     }
     else
     {
         DbgPrint("MiniDrv: ZwSetValueKey Start failed, status=%08X\r\n", status);
     }
-
     ZwClose(hKey);
     return status;
 }
 
-VOID TryRemoveSysdiagCallbackStub()
+NTSTATUS TryUnloadSysdiagDriver()
 {
-    UNICODE_STRING routineName = { 0 };
-    PVOID pFunc = NULL;
-
-    RtlInitUnicodeString(&routineName, L"PsRemoveProcessNotifyRoutine");
-    pFunc = MmGetSystemRoutineAddress(&routineName);
-
-    if (pFunc != NULL)
+    NTSTATUS status;
+    UNICODE_STRING drvName;
+    PDRIVER_OBJECT pDrvObj = NULL;
+    RtlInitUnicodeString(&drvName, L"sysdiag");
+    status = ObReferenceObjectByName(
+        &drvName,
+        OBJ_CASE_INSENSITIVE,
+        NULL,
+        0,
+        IoDriverObjectType,
+        NULL,
+        NULL,
+        (PVOID*)&pDrvObj
+    );
+    if (!NT_SUCCESS(status))
     {
-        DbgPrint("MiniDrv: PsRemoveProcessNotifyRoutine found at %p\r\n", pFunc);
+        DbgPrint("MiniDrv: ObReferenceObjectByName sysdiag failed %08X\r\n", status);
+        return status;
     }
-    else
+    if (pDrvObj->DriverUnload != NULL)
     {
-        DbgPrint("MiniDrv: PsRemoveProcessNotifyRoutine NOT FOUND\r\n");
+        DbgPrint("MiniDrv: Calling sysdiag DriverUnload\r\n");
+        pDrvObj->DriverUnload(pDrvObj);
     }
+    ObDereferenceObject(pDrvObj);
+    DbgPrint("MiniDrv: Sysdiag driver unload attempt finished\r\n");
+    return STATUS_SUCCESS;
 }
 
 NTSTATUS DriverEntry(_In_ PDRIVER_OBJECT DriverObject, _In_ PUNICODE_STRING RegistryPath)
 {
     UNREFERENCED_PARAMETER(RegistryPath);
     NTSTATUS status = STATUS_SUCCESS;
-
     DriverObject->DriverUnload = DriverUnload;
 
-    DbgPrint("==== MiniDrv Loaded: Windows 10 %u.%u ====\r\n", TARGET_WIN10_BUILD, TARGET_WIN15_REVISION);
+    DbgPrint("==== MiniDrv Loaded Win10 19045.7184 ====\r\n");
 
+    status = RemoveSysdiagProcessNotifyCallbacks();
+    if (!NT_SUCCESS(status))
+    {
+        DbgPrint("MiniDrv: Remove callback warning %08X\r\n", status);
+    }
     EnumAndKillHipsDaemon();
-    TryRemoveSysdiagCallbackStub();
+    TryUnloadSysdiagDriver();
     DisableSysdiagService();
 
-    DbgPrint("==== MiniDrv Work Done ====\r\n");
-
+    DbgPrint("==== MiniDrv All Task Finished ====\r\n");
     return status;
 }
