@@ -1,6 +1,3 @@
-#define _AMD64_
-#define _KERNEL_MODE
-#define _NTDDK_
 #define TARGET_WIN10_BUILD  19045
 #define TARGET_WIN15_REVISION 7184
 
