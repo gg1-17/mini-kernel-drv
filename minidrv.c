@@ -1,5 +1,8 @@
 #include <ntdef.h>
 #include <wdm.h>
+#include <ntimage.h>
+
+typedef enum _SYSTEM_INFORMATION_CLASS SYSTEM_INFORMATION_CLASS;
 
 typedef VOID (*PPROCESS_NOTIFY_ROUTINE)(
     _In_ HANDLE ParentId,
@@ -48,7 +51,6 @@ NTSTATUS RemoveSysdiagProcessNotifyCallbacks()
     PVOID pBuffer = NULL;
     UNICODE_STRING routineName;
     PPROCESS_NOTIFY_ENTRY pNotifyEntry;
-    ULONG i;
     PIMAGE_DOS_HEADER pDos;
     PIMAGE_NT_HEADERS pNt;
     PVOID modBase;
