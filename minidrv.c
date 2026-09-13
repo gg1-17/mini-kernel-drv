@@ -1,7 +1,7 @@
-#include <ntdef.h>
-#include <wdm.h>
+#include <ntddk.h>
 #include <ntimage.h>
 
+typedef struct _EPROCESS EPROCESS;
 typedef enum _SYSTEM_INFORMATION_CLASS SYSTEM_INFORMATION_CLASS;
 
 typedef VOID (*PPROCESS_NOTIFY_ROUTINE)(
