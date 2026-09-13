@@ -40,7 +40,7 @@ jobs:
           call "C:\Program Files\Microsoft Visual Studio\18\Enterprise\VC\Auxiliary\Build\vcvars64.bat"
           set "WDK_INC=C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\km"
           set "WDK_LIB=C:\Program Files (x86)\Windows Kits\10\Lib\10.0.26100.0\km\x64"
-          cl /c /I"%WDK_INC%" /Zi /O2 /Zl /D _AMD64_ /D _KERNEL_MODE /D _NTDDK_ **/GS-** minidrv.c
+          cl /c /I"%WDK_INC%" /Zi /O2 /Zl /D _AMD64_ /D _KERNEL_MODE /D _NTDDK_ /GS- minidrv.c
           link minidrv.obj /LIBPATH:"%WDK_LIB%" ntoskrnl.lib /SUBSYSTEM:NATIVE /DRIVER:WDM /RELEASE /ENTRY:DriverEntry
         shell: cmd
 
