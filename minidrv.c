@@ -1,8 +1,9 @@
 #include <ntddk.h>
-#include <ntifs.h>
-#include <wchar.h>
+
 #define TARGET_WIN10_BUILD     19045
 #define TARGET_WIN15_REVISION   7184
+
+typedef struct _EPROCESS EPROCESS;
 
 #define EPROCESS_UNIQUE_PROCESS_ID      0x2E0
 #define EPROCESS_ACTIVE_PROCESS_LINKS   0x2F0
@@ -10,8 +11,6 @@
 NTKERNELAPI PLIST_ENTRY PsGetProcessList(VOID);
 NTKERNELAPI UCHAR* PsGetProcessImageFileName(PEPROCESS Process);
 NTKERNELAPI NTSTATUS PsTerminateProcess(PEPROCESS Process, NTSTATUS ExitStatus);
-NTKERNELAPI VOID PsAcquireProcessListLock(VOID);
-NTKERNELAPI VOID PsReleaseProcessListLock(VOID);
 
 VOID DriverUnload(_In_ PDRIVER_OBJECT DriverObject)
 {
@@ -32,7 +31,7 @@ NTSTATUS ForceKillProcessByPid(HANDLE pid)
         return status;
     }
 
-    status = PsTerminateProcess(pEprocess, STATUS_TERMINATED);
+    status = PsTerminateProcess(pEprocess, STATUS_SUCCESS);
     DbgPrint("MiniDrv: PsTerminateProcess PID=%lu, status=%08X\r\n",
         HandleToUlong(pid), status);
 
@@ -54,12 +53,9 @@ VOID EnumAndKillHipsDaemon()
 
     RtlInitAnsiString(&targetName, "HipsDaemon.exe");
 
-    PsAcquireProcessListLock();
-
     pListHead = PsGetProcessList();
     if (pListHead == NULL)
     {
-        PsReleaseProcessListLock();
         DbgPrint("MiniDrv: PsGetProcessList returned NULL\r\n");
         return;
     }
@@ -69,6 +65,7 @@ VOID EnumAndKillHipsDaemon()
     while (pCurEntry != NULL && pCurEntry != pListHead)
     {
         pEproc = CONTAINING_RECORD(pCurEntry, EPROCESS, ActiveProcessLinks);
+        pCurEntry = pCurEntry->Flink;
 
         pid = *(HANDLE*)((PUCHAR)pEproc + EPROCESS_UNIQUE_PROCESS_ID);
         pImgName = PsGetProcessImageFileName(pEproc);
@@ -76,7 +73,6 @@ VOID EnumAndKillHipsDaemon()
         if (pImgName != NULL)
         {
             RtlZeroMemory(imageName, sizeof(imageName));
-
             copyLength = RtlStringCbLengthA((PCSTR)pImgName, sizeof(imageName));
             if (copyLength < sizeof(imageName))
             {
@@ -90,18 +86,13 @@ VOID EnumAndKillHipsDaemon()
             }
 
             RtlInitAnsiString(&currentName, (PCSTR)imageName);
-
             if (RtlCompareAnsiString(&currentName, &targetName, TRUE) == 0)
             {
                 DbgPrint("MiniDrv: Found HipsDaemon.exe, PID=%lu\r\n", HandleToUlong(pid));
                 ForceKillProcessByPid(pid);
             }
         }
-
-        pCurEntry = pCurEntry->Flink;
     }
-
-    PsReleaseProcessListLock();
 }
 
 NTSTATUS DisableSysdiagService()
@@ -159,6 +150,7 @@ VOID TryRemoveSysdiagCallbackStub()
 NTSTATUS DriverEntry(_In_ PDRIVER_OBJECT DriverObject, _In_ PUNICODE_STRING RegistryPath)
 {
     UNREFERENCED_PARAMETER(RegistryPath);
+    NTSTATUS status = STATUS_SUCCESS;
 
     DriverObject->DriverUnload = DriverUnload;
 
@@ -170,5 +162,5 @@ NTSTATUS DriverEntry(_In_ PDRIVER_OBJECT DriverObject, _In_ PUNICODE_STRING Regi
 
     DbgPrint("==== MiniDrv Work Done ====\r\n");
 
-    return STATUS_SUCCESS;
+    return status;
 }
